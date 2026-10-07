@@ -1,0 +1,35 @@
+openapi: 3.1.0
+info:
+  title: Modulith API
+  description: >-
+    HTTP contract between the React frontend and the Spring Boot backend.
+    Contract-first: the backend generates Spring interfaces from this file,
+    the frontend generates its TypeScript client from it.
+  version: 0.0.1
+servers:
+  - url: /
+tags:
+  - name: Greetings
+    description: Owned by the greeting component.
+paths:
+  /api/greetings:
+    get:
+      tags: [Greetings]
+      operationId: getGreeting
+      summary: Greets the default audience.
+      responses:
+        '200':
+          description: The greeting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greeting'
+components:
+  schemas:
+    Greeting:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          examples: [Hello, World!]

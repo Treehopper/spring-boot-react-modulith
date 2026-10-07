@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>modulith-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>modulith-frontend</artifactId>
+    <name>modulith-frontend</name>
+    <description>React app, packaged as a jar whose static/ folder Spring Boot serves from the classpath</description>
+
+    <build>
+        <resources>
+            <!-- Vite writes to dist/; Spring Boot serves classpath:/static/ by default. -->
+            <resource>
+                <directory>${project.basedir}/dist</directory>
+                <targetPath>static</targetPath>
+            </resource>
+        </resources>
+
+        <plugins>
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <version>${frontend-maven-plugin.version}</version>
+                <configuration>
+                    <nodeVersion>${node.version}</nodeVersion>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>install-node-and-npm</id>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>npm-ci</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>ci</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-lint</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run lint</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-build</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run build</arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

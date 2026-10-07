@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>modulith-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>modulith-backend</artifactId>
+    <name>modulith-backend</name>
+    <description>Spring Boot modulith; produces the single executable jar</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- HTTP Basic for Swagger UI (security.web.SecurityConfig). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <!-- Swagger UI on the management port (springdoc.use-management-port). -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        <!-- Referenced by the models generated from the OpenAPI spec. -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>modulith</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- The hand-written contract, served to Swagger UI by ApiContractEndpoint. -->
+            <resource>
+                <directory>${maven.multiModuleProjectDirectory}/openapi</directory>
+                <targetPath>openapi</targetPath>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>${openapi-generator.version}</version>
+                <configuration>
+                    <inputSpec>${maven.multiModuleProjectDirectory}/openapi/modulith-api.yaml</inputSpec>
+                    <generatorName>spring</generatorName>
+                    <modelNameSuffix>Dto</modelNameSuffix>
+                    <generateSupportingFiles>false</generateSupportingFiles>
+                    <generateApiTests>false</generateApiTests>
+                    <generateApiDocumentation>false</generateApiDocumentation>
+                    <generateModelTests>false</generateModelTests>
+                    <generateModelDocumentation>false</generateModelDocumentation>
+                    <configOptions>
+                        <interfaceOnly>true</interfaceOnly>
+                        <skipDefaultInterface>true</skipDefaultInterface>
+                        <useResponseEntity>false</useResponseEntity>
+                        <useSpringBoot4>true</useSpringBoot4>
+                        <useJakartaEe>true</useJakartaEe>
+                        <useTags>true</useTags>
+                        <openApiNullable>false</openApiNullable>
+                        <useBeanValidation>false</useBeanValidation>
+                        <documentationProvider>none</documentationProvider>
+                        <annotationLibrary>none</annotationLibrary>
+                        <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                    </configOptions>
+                </configuration>
+                <executions>
+                    <!--
+                        One execution per component that serves HTTP: each generates only its own tag's
+                        interfaces and models into its own web layer.
+                    -->
+                    <execution>
+                        <id>greeting-web</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <apisToGenerate>Greetings</apisToGenerate>
+                            <modelsToGenerate>Greeting</modelsToGenerate>
+                            <apiPackage>com.example.modulith.greeting.web.openapi</apiPackage>
+                            <modelPackage>com.example.modulith.greeting.web.openapi</modelPackage>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Default: embed the React build so the jar serves it from classpath:/static/. -->
+        <profile>
+            <id>embedded-frontend</id>
+            <activation>
+                <property>
+                    <name>!dev</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.example</groupId>
+                    <artifactId>modulith-frontend</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!--
+            Local development: `./mvnw -pl backend spring-boot:run -Ddev`
+            Skips the frontend jar and activates the `dev` Spring profile, which serves frontend/dist from disk.
+        -->
+        <profile>
+            <id>dev</id>
+            <activation>
+                <property>
+                    <name>dev</name>
+                </property>
+            </activation>
+            <properties>
+                <spring-boot.run.profiles>dev</spring-boot.run.profiles>
+            </properties>
+        </profile>
+    </profiles>
+</project>

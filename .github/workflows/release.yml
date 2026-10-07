@@ -1,0 +1,51 @@
+name: Release
+
+# Push a version tag to build the jar, pack it as .7z and attach it to a GitHub release:
+#   git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # create the release and upload its assets
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Builds the React frontend (Node is installed by the build), runs all tests,
+      # and produces the single executable jar.
+      - name: Build and test
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+      - name: Pack jar as 7z
+        run: |
+          command -v 7z >/dev/null || { sudo apt-get update && sudo apt-get install -y 7zip; }
+          mkdir -p dist
+          7z a -t7z -mx=9 "dist/modulith-${TAG}.7z" ./backend/target/modulith.jar
+          (cd dist && sha256sum "modulith-${TAG}.7z" > "modulith-${TAG}.7z.sha256")
+          7z l "dist/modulith-${TAG}.7z"
+
+      - name: Attach to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Re-run for an existing release: replace the assets.
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --verify-tag --title "$TAG" --generate-notes
+          fi
