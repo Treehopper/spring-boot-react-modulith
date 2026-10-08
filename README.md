@@ -13,6 +13,13 @@ Requirements: JDK 25. Maven runs through the wrapper, and Node is downloaded by 
 java -jar backend/target/modulith.jar  # http://localhost:8080
 ```
 
+On a desktop, the application opens http://localhost:8080 in the default browser once it is ready.
+It uses the operating system's own command (`open` on macOS, `rundll32` on Windows, `xdg-open` on
+Linux), not `java.awt.Desktop`. It skips this in CI (`CI` set), over SSH (`SSH_CONNECTION` or
+`SSH_TTY`), and on Linux without a display (`DISPLAY`/`WAYLAND_DISPLAY`), so servers and containers
+only log the URL. Turn it off with `--app.open-browser=false` (the tests do this through Surefire),
+or override the desktop detection with `--app.desktop=true|false`.
+
 ## Releases
 
 Pushing a tag that starts with `v` runs [`.github/workflows/release.yml`](.github/workflows/release.yml):
@@ -56,11 +63,11 @@ application is unchanged.
 
 | URL | What |
 |-----|------|
-| http://localhost:8081/actuator/swagger-ui | Swagger UI for the API contract (HTTP Basic, see below) |
+| http://localhost:8081/actuator/swagger-ui | Swagger UI for the API contract (login only with `adminPassword`, see below) |
 | http://localhost:8081/actuator/loggers | Read and change log levels at runtime |
 | http://localhost:8081/actuator/health | Health check |
 
-Only Swagger UI is password-protected. `loggers` and `health` are open, so anyone who can reach this
+Only Swagger UI can be password-protected. `loggers` and `health` are always open, so anyone who can reach this
 port can change log levels, for example to flood the logs. Before using it remotely (for example
 inside a container), either bind `management.server.address` to an internal network, or extend the
 protected paths in `security.web.SecurityConfig`. Only the endpoints listed in
@@ -96,8 +103,11 @@ classpath, `apidocs.web.ApiContractEndpoint` serves it at `/actuator/apicontract
 `springdoc.swagger-ui.url` points Swagger UI there. springdoc's own code-derived spec is not exposed:
 `openapi` is missing from the exposure list on purpose.
 
-Swagger UI and the contract require **HTTP Basic** authentication. The user is `admin`, and the
-password comes from the `adminPassword` property:
+By default, Swagger UI is **open without a login**. The management port only listens on `127.0.0.1`,
+so only whoever is on this machine can reach it, and they have full control anyway.
+
+To require a login, set `adminPassword`. Swagger UI and the contract then use **HTTP Basic**
+authentication with the user `admin`:
 
 ```sh
 java -DadminPassword=snakeoil -jar modulith.jar      # system property: -D must come before -jar
@@ -106,10 +116,21 @@ ADMINPASSWORD=snakeoil java -jar modulith.jar        # environment variable; kee
 ./mvnw -pl backend spring-boot:run -Ddev -Dspring-boot.run.arguments=--adminPassword=snakeoil
 ```
 
-`java -jar modulith.jar -DadminPassword=...` does **not** work. Everything after the jar name is a
-program argument, not a JVM option. Without a password, the application starts, logs a warning,
-and Swagger UI stays locked: every request is rejected with 401, and there is no default password.
-The password is held only as a bcrypt hash in memory.
+| | Management port on loopback (default) | Management port beyond loopback |
+|---|---|---|
+| `adminPassword` not set | **Open**, no login (logged at INFO) | **Closed**: 403, with a warning at startup |
+| `adminPassword` set | Login required | Login required |
+
+There is no default password. The "closed" case is a safeguard: if you set `management.server.address`
+to something other than loopback (for example `0.0.0.0` in a container), Swagger UI doesn't become
+reachable from the network without a password by accident.
+
+An empty password (`--adminPassword=`) fails startup, because it is almost always a mistake, such as
+an unset variable in a start script. The password is held only as a bcrypt hash in memory.
+
+`java -jar modulith.jar -DadminPassword=...` does **not** set the password. Everything after the jar
+name is a program argument, not a JVM option. Swagger UI is then open without a login, and the
+startup log says so.
 
 "Try it out" is disabled (`springdoc.swagger-ui.supported-submit-methods=`). Swagger UI runs on 8081
 and the API on 8080, so its requests would be cross-origin and need CORS on the API. To try requests
@@ -201,7 +222,8 @@ Example components:
   `GET /api/greetings` by implementing the generated `GreetingsApi`.
 - `frontend` (web): serves the React app.
 - `apidocs` (web): serves the API contract to Swagger UI on the management port.
-- `security` (web): HTTP Basic for Swagger UI, everything else open.
+- `security` (web): HTTP Basic for Swagger UI when `adminPassword` is set, everything else open.
+- `desktop` (core, web): detects a local desktop session and opens the browser at startup.
 
 Core never depends on data. Instead, data implements interfaces that core owns (dependency inversion),
 so JPA stays out of the business logic.
